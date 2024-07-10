@@ -53,6 +53,10 @@ class EmonHubMBUSInterfacer(EmonHubInterfacer):
         
         self.device = device
         self.baud = baud
+        
+        self.debug_data_frame = False
+        
+        self.invalid_count = 0
 
         # Only load module if it is installed
         try:
@@ -196,6 +200,10 @@ class EmonHubMBUSInterfacer(EmonHubInterfacer):
             0x2c: (10, "Power", "W"),
             0x2d: (100, "Power", "W"),       
             0x2e: (1000, "Power", "W"),
+            
+            0x38: (0.000001, "FlowRate", "m3/h"), # mm3/h
+            0x39: (0.00001, "FlowRate", "m3/h"), # mm3/h
+            0x3a: (0.0001, "FlowRate", "m3/h"), # mm3/h
             0x3b: (0.001, "FlowRate", "m3/h"), # mm3/h
             0x3c: (0.01, "FlowRate", "m3/h"), # mm3/h
             0x3d: (0.1, "FlowRate", "m3/h"), # mm3/h
@@ -245,7 +253,7 @@ class EmonHubMBUSInterfacer(EmonHubInterfacer):
         name_count = {}
         record = 0
         
-        debug = False
+        debug = self.debug_data_frame
 
         for bid in range(0,len(data)):
             this = next
@@ -465,7 +473,9 @@ class EmonHubMBUSInterfacer(EmonHubInterfacer):
                             
                     if bid == bid_end and val == 0x16:
                         time_elapsed = time.time()-start_time
-                        self._log.debug("Invalid MBUS data received %d bytes %0.1f ms" % (bid,time_elapsed*1000))
+
+                        self.invalid_count += 1
+                        self._log.debug("Invalid MBUS data received %d bytes %0.1f ms, count: %d" % (bid,time_elapsed*1000,self.invalid_count))
                                 
                         if valid: # Parse frame if still valid
                             if self.use_meterbus_lib:
@@ -480,8 +490,15 @@ class EmonHubMBUSInterfacer(EmonHubInterfacer):
             self._log.error("read_data_frame could not read from serial port")         
         # If we are here data response is corrupt
         time_elapsed = time.time()-start_time
-        self._log.debug("Invalid MBUS data received %d bytes %0.1f ms" % (bid,time_elapsed*1000))       
+        self.invalid_count += 1
+        self._log.debug("Invalid MBUS data received %d bytes %0.1f ms, count: %d" % (bid,time_elapsed*1000,self.invalid_count))
         # end of read_data_frame
+        
+        if self.invalid_count>=10:
+            # Reset invalid count
+            self.invalid_count = 0
+            self._log.debug("Invalid count = 10. Restarting MBUS serial connection on next read")
+            self.ser = False
 
     def add_result_to_cargo(self,meter,c,result):
         if result != None:
@@ -559,7 +576,7 @@ class EmonHubMBUSInterfacer(EmonHubInterfacer):
                         result = self.request_data_sdm120(address,[1,7,11,23])
                         self.add_result_to_cargo(meter,c,result)
                     elif meter_type=="kamstrup403":
-                        result = self.request_data(address,[1,4,12,13,14,15,20])
+                        result = self.request_data(address,[1,4,7,8,9,10,11,12,14])
                         self.add_result_to_cargo(meter,c,result)
                         # ------------------------------------------------------
                             
