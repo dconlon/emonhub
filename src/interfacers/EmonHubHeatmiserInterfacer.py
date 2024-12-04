@@ -128,7 +128,7 @@ class EmonHubHeatmiserInterfacer(EmonHubInterfacer):
                 if key not in device:
                     self._log.error("key '%s' not found in [%s] for %s", key, ', '.join(device.keys()), zone_name)
                     continue
-                if key == 'CURRENT_FLOOR_TEMPERATURE' and device[key] > 127:
+                if key == 'CURRENT_FLOOR_TEMPERATURE' and device[key] > 126:
                     # Skip for zones that don't have floor temp probe
                     continue
                 label = zone_name + ' ' + key
