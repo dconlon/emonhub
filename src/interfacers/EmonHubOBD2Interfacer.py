@@ -137,6 +137,20 @@ class EmonHubOBD2Interfacer(EmonHubInterfacer):
         if not values:
             raise Exception(f"No values obtained")
             
+        # Add the user-friending SoC (i.e. that shown as 0-100% range on the dash to the user).  This is rather hacky
+        # but not expecting this code to ever be shared.
+        try:
+            index = names.index("EV_BATTERY_SOC")
+            raw_value = values[index]
+            user_value = (raw_value*1.28)-20.7
+            if user_value > 100:
+                user_value = 100
+            names.append("EV_USER_SOC")
+            values.append(user_value)
+            self._log.info(f"EV_USER_SOC: {user_value}")           
+        except ValueError:
+            pass
+            
         # Cargo object for returning values
         c = Cargo.new_cargo()
         c.rawdata = None
