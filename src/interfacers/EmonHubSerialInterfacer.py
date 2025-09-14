@@ -86,6 +86,10 @@ class EmonHubSerialInterfacer(EmonHubInterfacer):
         # Create a Payload object
         c = Cargo.new_cargo(rawdata=f)
 
+        # Ignore comments
+        if f.startswith('#'):
+            return
+
         f = f.split()
 
         if int(self._settings['nodeoffset']):
