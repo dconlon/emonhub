@@ -1,23 +1,50 @@
-# emonHub Configuration
+---
+github_url: "https://github.com/openenergymonitor/emonhub/blob/master/docs/configuration.md"
+---
+# emonHub Configuration File
 
 ## Overview
 
-emonHub is configured with `emonhub.conf` config file. On the emonPi / emonBase this file is located in `/etc/emonhub/emonhub.conf`. If the [Emoncms Config module](https://github.com/emoncms/config) is installed (as in the case of the emonPi / emonBase using pre-buit SD card image) the config file can be edited direct from the EmonHub tab in local Emoncms, see [Overview](overview.md).
+emonHub is configured via the `emonhub.conf` config file. On the emonPi & emonBase this file is located in `/etc/emonhub/emonhub.conf`.
 
-Emonhub.conf has 3 sections:
+```{admonition} emonCMS inputs not updating?
+When making changes to the configuration, the emonhub service should always be restarted and the log checked for errors.
+```
+
+## Editing the emonHub configuration file
+
+For users with an emonPi/emonBase or RaspberryPi running emonSD, emonHub can be configured from within emonCMS. Navigate to **Setup > EmonHub > Edit Config:**
+
+![emonhubconf.png](img/emonhubconf.png)
+
+Alternatively the emonHub configuration can be edited in the config file directly via command line:
+
+```bash
+    nano /etc/emonhub/emonhub.conf
+```
+
+In most cases, EmonHub will automatically update to use the latest configuration. If a change does not update, emonHub can be restarted either by clicking on 'Restart' on the emonCMS > EmonHub page, or by restarting via command line:
+
+```bash
+    sudo systemctl restart emonhub
+```
+
+## Configuration file Structure
+
+`emonhub.conf` has 3 sections:
 
 ```
-#######################################################################
-#######################      emonhub.conf     #########################
-#######################################################################
-### emonHub configuration file, for info see documentation:
-### https://github.com/openenergymonitor/emonhub/blob/emon-pi/conf/emonhub.conf
 #######################################################################
 #######################    emonHub  settings    #######################
 #######################################################################
 [hub]
 ### loglevel must be one of DEBUG, INFO, WARNING, ERROR, and CRITICAL
 loglevel = DEBUG
+
+### Autoconf is used to automatically add node decoders
+### If you have unknown nodes appearing disable this feature
+### Make sure to restart emonHub after changing this
+autoconf = 1
 
 #######################################################################
 #######################       Interfacers       #######################
@@ -30,242 +57,62 @@ loglevel = DEBUG
 [nodes]
 ```
 
-### 1. Hub
+### 1. [Hub]
 
 Hub is a section for emonhub global settings such as the loglevel.
 
-### 2. Interfacers
+### 2. [Interfacers]
 
-Interfacers holds the configuration for the different interfacers that emonhub supports such as the EmonHubJeeInterfacer for reading and writing to the RFM69Pi adapter board or emonPi board via serial, or the EmonHubMqttInterfacer which can be used to publish the data received from EmonHubJeeInterfacer to MQTT topics. For more interfacer examples see [conf/interfacer_examples](conf/interfacer_examples)
+The Interfacers section holds the configuration for the different interfacers that emonhub supports.
 
-#### Channels
+Interfacers are often hierarchical, so inherit settings and options from a parent Interfacer.
 
-Each interfacer can listen on a `subchannel` or publish on a `pubchannel`. Some interfacers can do both.
+### 3. [Nodes]
 
-**For Example:**
-
-The Serial Interfacer listens on the serial port then publishes that data for onward transmission - it has a `pubchannel` defined.
-
-The MQTT interfacer listens for data which it then sends out via MQTT, it therefore defines a `subchannel` that it will listen on for data to send via MQTT.
-
-For data to be passed, the name of the 2 channels must match.
-
-Each interfacer can have multiple channels defined and multiple interfacers can listen to the same channel. e.g. data published by the Serial Interfacer can be listened (subscribed) for by the MQTT and the HTTP interfacer.
-
-**Note** The channel definition is a list so must end with a comma e.g. `pubchannels = ToEmonCMS,` or `pubchannels = ToEmonCMS,ToXYZ,`
-
-### 3. Nodes
-
-Nodes holds the decoder configuration for rfm12/69 node data which are sent as binary structures.
+The Nodes section holds the decoder configuration for rfm12/69 node data which are sent as binary structures.
 
 ---
 
-## 1. Hub Configuration
-
-Hub is a section for emonhub global settings such as the loglevel.
+## 1. [Hub] Configuration
 
 The hub configuration should be self explanatory. Emonhub log can be viewed in the `Setup > EmonHub` section of local Emoncms on an emonPi / emonBase. Default settings are:
 
 ```text
 ### loglevel must be one of DEBUG, INFO, WARNING, ERROR, and CRITICAL
 loglevel = DEBUG
+
 ### Uncomment this to also send to syslog
 # use_syslog = yes
+
+### Autoconf is used to automatically add node decoders
+### If you have unknown nodes appearing disable this feature
+### Make sure to restart emonHub after changing this
+autoconf = 1
 ```
 
 ---
 
-## 2. Interfacers Configuration
+## 2. [Interfacers] Configuration
 
-Interfacers holds the configuration for the different interfacers that emonhub supports such as the EmonHubJeeInterfacer for reading and writing to the RFM69Pi adapter board or emonPi board via serial, or the EmonHubMqttInterfacer which can be used to publish the data received from EmonHubJeeInterfacer to MQTT topics.
+The settings for a particular interfacer are largely unique to that interfacer except for the `pubchannel` and `subchannel` which are common to all.
 
-Each interfacer has a unique name between the first set of double brackets `[[xxx]]`
+Each interfacer has a unique name between the first set of double brackets `[[xxx]]`. This can be anything and will then be seen in the log file. An Interfacer can be declared twice (such as the MQTT Interfacer to send data to 2 different brokers).
 
-The `Type` corresponds to the interfacer file name as found in `src/interfacers/` directory.
+The `Type` setting corresponds to the interfacer file name as found in `src/interfacers/` directory.
 
-`[[[init_settings]]]` are settings used by the interfacer on setup. These are usually defined in the header of the interfacer file.
+`[[[init_settings]]]` are settings used by the interfacer on setup. These are usually defined in the header of the interfacer file. If changed, the emonHub service must be restarted.
 
-`[[[runtime_settings]]]` are other settings for the interfacer.  The first setting in this group must be either `pubchannels` or `subchannels` and must end with a comma. There must be a blank line. The remaining options are optional and if not specified will fall back to the interfacer defaults.
+`[[[runtime_settings]]]` are other settings for the interfacer.  The first setting in this group must be either `pubchannels` or `subchannels` and **must** end with a comma. There **must** be a blank line between this and subsequent settings.
 
-### a.) [[RFM2Pi]]
+The remaining options are optional and if not specified will fall back to the interfacer defaults.
 
-The `[[RFM2Pi]]` interfacer section contains the settings to read from RFM69Pi / emonPi boards via GPIO internal serial port `/dev/ttyAMA0`. The default serial baud on all emonPi and RFM69Pi is `38400`. Older RFM12Pi boards using `9600` baud.
+---
 
-The frequency and network group must match the hardware and other nodes on the network.
+## 3. [Nodes] Configuration
 
-The `calibration` config is used to set the calibration of the emonPi when using USA AC-AC adapters 110V. Set `calibration = 110V` when using USA AC-AC adapter.
+The final part of the `emonhub.conf` configuration concerns decoding of RFM12 and RFM69 nodes. The data in encoded before transmission and the received data must therefore be 'decoded' i.e. converted from a raw datacode to recgonisable values.
 
-```text
-[[RFM2Pi]]
-    Type = EmonHubJeeInterfacer
-    [[[init_settings]]]
-        com_port = /dev/ttyAMA0
-        com_baud = 38400                        # 9600 for old RFM12Pi
-    [[[runtimesettings]]]
-        pubchannels = ToEmonCMS,
-        subchannels = ToRFM12,
-
-        group = 210
-        frequency = 433
-        baseid = 5                              # emonPi / emonBase nodeID
-        quiet = true                            # Report incomplete RF packets (not implemented on emonPi)
-        calibration = 230V                      # (UK/EU: 230V, US: 110V)
-        # interval =  0                         # Interval to transmit time to emonGLCD (seconds)
-```
-
-### b.) [[MQTT]]
-
-Emonhub supports publishing to MQTT topics through the EmonHubMqttInterfacer, defined in the interfacers section of emonhub.conf.
-
-There are two formats that can be used for publishing node data to MQTT:
-
-#### **1. Node only format**
-
-(default base topic is `emonhub`)
-
-```text
-    topic: basetopic/rx/10/values
-    payload: 100,200,300
-```
-
-The 'node only format' is used with the emoncms Nodes Module (now deprecated on Emoncms V9+) and the emonPiLCD python service.
-
-#### **2. Node variable format**
-
-(default base topic is `emon`)
-
-```text
-    topic: basetopic/emontx/power1
-    payload: 100
-```
-
-The 'Node variable format' is the current default format from Emoncms V9. It's a more generic MQTT publishing format that can more easily be used by applications such as NodeRED and OpenHab. This format can also be used with the emoncms `phpmqtt_input.php` script in conjunction with the emoncms inputs module. See [User Guide > Technical MQTT](https://guide.openenergymonitor.org/technical/mqtt/).
-
-#### **3. JSON format**
-
-##### Defaults
-
-```python
-'node_format_enable': 1,
-'node_format_basetopic': 'emonhub/',
-'nodevar_format_enable': 0,
-'nodevar_format_basetopic': "nodes/",
-'node_JSON_enable': 0,
-'node_JSON_basetopic': "emon/"
-```
-
-Emoncms default base topic that it listens for is `emon/`.
-
-```text
-topic: basetopic/<noeid>
-payload: {"key1":value1, "key2":value2, .... "time":<timestamp>, "rssi":<rssi>}
-```
-
-This forat exports the data as a single JSOn string with key:value pairs. The timestamp is automatically added and used for the input time to emoncms. The RSSI is added if available (RF in use).
-
-### Default `[MQTT]` config
-
-Note - the trailing `/` is required on the topic definition.
-
-```text
-[[MQTT]]
-
-    Type = EmonHubMqttInterfacer
-    [[[init_settings]]]
-        mqtt_host = 127.0.0.1
-        mqtt_port = 1883
-        mqtt_user = emonpi
-        mqtt_passwd = emonpimqtt2016
-
-    [[[runtimesettings]]]
-        # pubchannels = ToRFM12,
-        subchannels = ToEmonCMS,
-
-        # emonhub/rx/10/values format
-        # Use with emoncms Nodes module
-        node_format_enable = 0
-        node_format_basetopic = emonhub/
-
-        # emon/emontx/power1 format - use with Emoncms MQTT input
-        # http://github.com/emoncms/emoncms/blob/master/docs/RaspberryPi/MQTT.md
-        nodevar_format_enable = 1
-        nodevar_format_basetopic = emon/
-
-        # Single JSON payload published  - use with Emoncms MQTT
-        node_JSON_enable = 0
-        node_JSON_basetopic = emon/
-```
-
-To enable one of the formats set the `enable` flag to `1`.  More than one format can be used simultaneously.
-
-### c.) [[emoncmsorg]]
-
-The EmonHubEmoncmsHTTPInterfacer configuration that is used for sending data to emoncms.org (or any instance of emoncms). If you wish to use emoncms.org the only change to make here is to replace the blank apikey with your write apikey from emoncms.org found on the user account page. See [Setup Guide > Setup > Remote logging](https://guide.openenergymonitor.org/setup/remote).
-
-```text
-    [[emoncmsorg]]
-        Type = EmonHubEmoncmsHTTPInterfacer
-        [[[init_settings]]]
-        [[[runtimesettings]]]
-            pubchannels = ToRFM12,
-            subchannels = ToEmonCMS,
-            url = https://emoncms.org
-            apikey = xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-            senddata = 1
-            sendstatus = 1
-```
-
-`sendstatus` - It is possible to the EmonHubEmoncmsHTTPInterfacer to send a 'ping' to the destination emoncms that can be picked up by the myip module which will then list the source IP address. This can be useful for remote login to a home emonpi if port forwarding is enabled on your router.
-
-`senddata` - If you only want to send the ping request, and no data, to emoncms.org set this to 0
-
-You can create more than one of these sections to send data to multiple emoncms instances. For example, if you wanted to send to an emoncms running at emoncms.example.com (or on a local LAN) you would add the following underneath the `emoncmsorg` section described above:
-
-```text
-    [[emoncmsexample]]
-        Type = EmonHubEmoncmsHTTPInterfacer
-        [[[init_settings]]]
-        [[[runtimesettings]]]
-            pubchannels = ToRFM12,
-            subchannels = ToEmonCMS,
-            url = https://emoncms.example.com
-            apikey = xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-            senddata = 1
-            sendstatus = 1
-```
-
-This time, the API key will be the API key from your account at emoncms.example.com.
-
-### Interfacers Extended
-
-In addition to the above core interfacers used as part of the core OpenEnergyMonitor configuration, EmonHub supports a wide variety of interfacers for reading data from different hardware sources, these interfacers have been documented separately, follow the links for more information:
-
-- [Socket Interfacer](conf/interfacer_examples/Socket)
-- [Space separated serial interfacer](conf/interfacer_examples/directserial)
-- [EmonTX V3 Interfacer (key:value pairs)](conf/interfacer_examples/directserial-serialtx3e)
-- [SDS011 Air Quality Sensor Interfacer](conf/interfacer_examples/SDS011)
-- [Tesla Power Wall Interfacer](conf/interfacer_examples/PowerWall)
-- [BMW Connected Drive Interface](conf/interfacer_examples/bmw)
-- [Graphite interfacer](conf/interfacer_examples/graphite)
-- [TCP Modbus interfacer (Fronius Inverters)](conf/interfacer_examples/modbus)
-- [Renogy Interfacer](conf/interfacer_examples/Renogy)
-- [SMA Solar Interfacer](conf/interfacer_examples/smasolar)
-- [Smilices Interfacer](conf/interfacer_examples/smilices)
-- [Victron VE.Direct Protocol Interfacer](conf/interfacer_examples/vedirect)
-- [Pulse counting interfacer](conf/interfacer_examples/Pulse)
-- [DS18B20 temperature sensing interfacer](conf/interfacer_examples/DS18B20)
-- [SDM120-Modbus Interfacer](conf/interfacer_examples/SDM120)
-- [MBUS Interfacer](conf/interfacer_examples/MBUS)
-- [Redis Interfacer](conf/interfacer_examples/Redis)
-- [Jaguar Land Rover Interfacer](conf/interfacer_examples/JaguarLandRover)
-
-***
-
-## 3. Nodes Configuration
-
-The 2nd part of the emonhub.conf configuration concerns decoding of RFM12 and RFM69 nodes. The data in encoded before transmission and the received data must therefore be 'decoded' i.e. converted from a raw datacode to recgonisable values.
-
-Here's an example of what this section looks like from the default emonpi emonhub.conf. The rest of this readme explains what each line means and how to write your own node decoders or adapt existing decoders for new requirements.
+Here's an example of what this section looks like from the default emonpi `emonhub.conf`. The rest of this readme explains what each line means and how to write your own node decoders or adapt existing decoders for new requirements.
 
 ```text
 
@@ -294,6 +141,18 @@ Here's an example of what this section looks like from the default emonpi emonhu
 
 ```
 
+```{tip}
+Autoconf is enabled as standard and is used to automatically add node decoders from a known list of common packet lengths and nodeid's. 
+
+If you have unknown nodes appearing **Turn off autoconf** at the top of emonhub.conf (set autoconf = 0) and **restart emonHub**. Remove the unknown nodes, keep only the nodes that you wish to keep.
+
+Unknown nodes can also be cleared in emoncms with the following URL:
+
+    https://emoncms.org/device/clean.json
+    http://emonpi.local/device/clean.json
+       
+```
+
 ### NodeID
 
 ```text
@@ -311,22 +170,6 @@ nodename =
 A text string, for your benefit in identifying each node. *This field is optional.*
 
 MQTT: The nodename can be used with the MQTT interfacer to send topics of the form nodes/nodename/variablename.
-
-### firmware
-
-```text
-firmware =
-```
-
-A text string specifying the sketch running on the node. (At present, this is for information only. At some future time, it might be used to auto-configure emonHub and/or the sketch.) *This field is optional.*
-
-### hardware
-
-```text
-hardware =
-```
-
-Indicates the host environment for human reference. **This field is optional.**
 
 ### rx
 
@@ -501,8 +344,6 @@ Copied here for reference:
 ```text
 [[5]]
     nodename = emonPi
-    firmware = emonPi_RFM69CW_RF12Demo_DiscreteSampling.ino
-    hardware = emonpi
     [[[rx]]]
         names = power1,power2,power1_plus_power2,Vrms,T1,T2,T3,T4,T5,T6,pulseCount
         datacodes = h, h, h, h, h, h, h, h, h, h, L
@@ -521,8 +362,6 @@ Copied here for reference:
 ```text
 [[8]]
     nodename = emonTx_3
-    firmware =V2_3_emonTxV3_4_DiscreteSampling
-    hardware = emonTx_(NodeID_DIP_Switch1:OFF)
     [[[rx]]]
         names = power1, power2, power3, power4, Vrms, temp1, temp2, temp3, temp4, temp5, temp6, pulse
         datacodes = h,h,h,h,h,h,h,h,h,h,h,L
@@ -539,8 +378,6 @@ Can be on either nodeid 10 or 9
 ```text
 [[10]]
     nodename = emonTx_1
-    firmware =V1_6_emonTxV3_4_DiscreteSampling
-    hardware = emonTx_(NodeID_DIP_Switch1:OFF)
     [[[rx]]]
         names = power1, power2, power3, power4, Vrms, temp1, temp2, temp3, temp4, temp5, temp6, pulse
         datacode = h
@@ -553,8 +390,6 @@ Can be on either nodeid 10 or 9
 ```text
 [[10]]
     nodename = emonTx_1
-    firmware =V1_6_emonTxV3_4_DiscreteSampling
-    hardware = emonTx_(NodeID_DIP_Switch1:OFF)
     [[[rx]]]
         names = power1, power2, power3, power4, Vrms, temp
         datacode = h
@@ -571,8 +406,6 @@ Standard nodeid's: 23, 24, 25 & 26 depending on DIP switch positions:
 ```text
 [[23]]
     nodename = emonTH_5
-    firmware = V2.x_emonTH_DHT22_DS18B20_RFM69CW_Pulse
-    hardware = emonTH_(Node_ID_Switch_DIP1:OFF_DIP2:OFF)
     [[[rx]]]
         names = temperature, external temperature, humidity, battery, pulseCount
         datacodes = h,h,h,h,L
@@ -589,8 +422,6 @@ Standard nodeid's: 19, 20, 21 & 22 depending on DIP switch positions:
 ```text
 [[19]]
     nodename = emonTH_1
-    firmware = emonTH_DHT22_DS18B20_RFM69CW
-    hardware = emonTH_(Node_ID_Switch_DIP1:OFF_DIP2:OFF)
     [[[rx]]]
         names = temperature, external temperature, humidity, battery
         datacode = h
@@ -605,8 +436,6 @@ EmonTX Shield [Firmware location](https://github.com/openenergymonitor/emontx-sh
 ```text
 [[6]]
     nodename = emonTxShield
-    firmware =emonTxShield
-    hardware = emonTxShield
     [[[rx]]]
         names = power1, power2, power3, power4, Vrms
         datacode = h
@@ -616,7 +445,7 @@ EmonTX Shield [Firmware location](https://github.com/openenergymonitor/emontx-sh
 
 ---
 
-## 4. Troubleshooting
+## Troubleshooting
 
 ### Node data inactive or, node data does not appear for a configured node
 
