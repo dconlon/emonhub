@@ -192,9 +192,9 @@ Here's a cut down interfacer which just reads Power and Energy imported:
 
 **Tip:** When logging the cumulative energy output (sdm_E) to a feed, use the 'log to feed (join)' input processor to create a feed that can work with the delta mode in graphs. This removes any data gaps and makes it possible for the graph to generate daily kWh data on the fly.
 
-##### SDM630 Three-phase
+##### SDM630 and SDM72D Three-phase
 
-Default config to read from SDM630 Modbus three-phase 100A meter, see [here more full SDM630 register list](http://support.innon.com/PowerMeters/SDM630-MOD-MID/Manual/SDM630-Modbus_Protocol.pdf), convert hex register to decimal before inserting into emonhub.conf
+Default config to read from SDM630 and SDM72D Modbus three-phase 100A meter, see [datasheet for full register list](http://support.innon.com/PowerMeters/SDM630-MOD-MID/Manual/SDM630-Modbus_Protocol.pdf), convert hex register to decimal before inserting into emonhub.conf
 ```
 [[SDM630]]
     Type = EmonHubMinimalModbusInterfacer
@@ -241,8 +241,33 @@ EmonHub can read from a [Rayleigh RI-D35-100](https://www.rayleigh.com/ri-d35-10
 [Rayleigh Modbus register documentaion](https://www.rayleigh.com/media/uploads/RI-D35-C-COMM-V01.pdf)
 
 
+#### Eaton EPBMETER1
 
----
+EmonHub can read from a [Eaton EPBMETER1](https://www.eaton.com/gb/en-gb/skuPage.EPBMETER1.html) three-phase panel-mount electricity meter via modbus using the following config:
+
+```
+[[EPBMETER1]]
+        Type = EmonHubMinimalModbusInterfacer
+        [[[init_settings]]]
+            device = /dev/ttyACM*
+            baud = 9600
+        [[[runtimesettings]]]
+            pubchannels = ToEmonCMS,
+            read_interval = 10
+            nodename = heatpump
+            [[[[meters]]]]
+                [[[[[electric]]]]]
+                    address = 1
+                    registers = 1,3,5,97
+                    names = V1,V2,V3,total_energy_imported
+                    precision = 1,1,1,1
+```
+
+Modbus settings should be: `parity = none` and `stopbit = 1`.
+
+[EPBMETER1 Modbus register documentaion](https://files.openenergymonitor.org/EPBMETER1.pdf), add one to the last part of the address to get the modbodbus register number to use in emonhub. e.g `total_energy_imported (kWh)` has address `30096` therefore emonhub register is `97`
+
+
 
 ### M-Bus Reader for Electric and Heat meters
 
