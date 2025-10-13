@@ -9,7 +9,6 @@ import sys
 import time
 import traceback
 import Cargo
-from pymodbus.client import ModbusTcpClient
 from emonhub_interfacer import EmonHubInterfacer
 
 
@@ -31,6 +30,25 @@ class EmonHubModbusTcpInterfacer2(EmonHubInterfacer):
         self._modbus = None
         
         self._slaves = []
+
+        # Only load pymodbus and packaging modules during init so that emonhub without this interfacer defined in its
+        # configuration will still start without pymodbus and packaging installed
+        import pymodbus
+        from packaging.version import parse as parse_version
+        if parse_version(pymodbus.__version__) < parse_version('3.10.0'): # Tested up to v3.11.2
+            raise Exception(f"pymodbus version {pymodbus.__version__} found, minimum version 3.10.0 required")
+        self.pymodbus = pymodbus.client.ModbusTcpClient
+
+        self._DATATYPES = {
+            'float32': (2, self.pymodbus.DATATYPE.FLOAT32),
+            'float64': (4, self.pymodbus.DATATYPE.FLOAT64),
+            'int16': (1, self.pymodbus.DATATYPE.INT16),
+            'int32': (1, self.pymodbus.DATATYPE.INT32),
+            'int64': (1, self.pymodbus.DATATYPE.INT64),
+            'uint16': (1, self.pymodbus.DATATYPE.UINT16),
+            'uint32': (1, self.pymodbus.DATATYPE.UINT32),
+            'uint64': (1, self.pymodbus.DATATYPE.UINT64)
+        }
         
         
     def set(self, **kwargs):
@@ -90,7 +108,7 @@ class EmonHubModbusTcpInterfacer2(EmonHubInterfacer):
             return
         
         # Connect to Modbus gateway
-        self._modbus = ModbusTcpClient(self._host, port=self._port)        
+        self._modbus = self.pymodbus(self._host, port=self._port)        
             
     def _fetch(self):
         data = {}
@@ -100,27 +118,29 @@ class EmonHubModbusTcpInterfacer2(EmonHubInterfacer):
     
             # Read coils
             if 'coil_names' in config:
-                address = config['coil_address'] if 'coil_address' in config else 0
-                data = data | self._read_bits('read_coils', slave_id, address, [name + "_" + n for n in  config['coil_names']])
+                addresses = config['coil_addresses'] if 'coil_addresses' in config else [0]
+                data = data | self._read_bits('read_coils', slave_id, addresses, [name + "_" + n for n in  config['coil_names']])
             
             # Read discrete inputs
             if 'discrete_input_names' in config:
-                address = config['discrete_input_address'] if 'discrete_input_address' in config else 0
-                data = data | self._read_bits('read_discrete_inputs', slave_id, address, [name + "_" + n for n in  config['discrete_input_names']])
+                addresses = config['discrete_input_addresses'] if 'discrete_input_addresses' in config else [0]
+                data = data | self._read_bits('read_discrete_inputs', slave_id, addresses, [name + "_" + n for n in  config['discrete_input_names']])
             
             # Read input registers
             if 'input_register_names' in config:
                 names = [name + "_" + n for n in config['input_register_names']]
-                address = config['input_register_address'] if 'input_register_address' in config else 0
+                addresses = [int(a) for a in config['input_register_addresses']] if 'input_register_addresses' in config else [0]
+                datatypes = config['input_register_datatypes'] if 'input_register_datatypes' in config else None
                 scales = [float(n) for n in config['input_register_scales']] if 'input_register_scales' in config else [1] * len(names)
-                data = data | self._read_registers('read_input_registers', slave_id, address, names, scales)
+                data = data | self._read_registers('read_input_registers', slave_id, addresses, datatypes, names, scales)
         
             # Read holding registers
             if 'holding_register_names' in config:
                 names = [name + "_" + n for n in config['holding_register_names']]
-                address = config['holding_register_address'] if 'holding_register_address' in config else 0
+                addresses = [int(a) for a in config['holding_register_addresses']] if 'holding_register_addresses' in config else [0]
+                datatypes = config['holding_register_datatypes'] if 'holding_register_datatypes' in config else None
                 scales = [float(n) for n in config['holding_register_scales']] if 'holding_register_scales' in config else [1] * len(names)
-                data = data | self._read_registers('read_holding_registers', slave_id, address, names, scales)                
+                data = data | self._read_registers('read_holding_registers', slave_id, addresses, datatypes, names, scales)                
         
         # Log the data
         for key, value in data.items():
@@ -136,32 +156,75 @@ class EmonHubModbusTcpInterfacer2(EmonHubInterfacer):
 
         return c
         
-    def _read_bits(self, method, slave_id, start_address, names):
+    def _read_bits(self, method, slave_id, addresses, names):
         result = {}
-    
-        # Read len(names) of consecutive coils/registers
-        res = getattr(self._modbus,method)(start_address, count = len(names), slave=slave_id)
+
+        if len(addresses) == 1:
+            # Just given a starting addresses, all are consecutive
+            addresses = list(range(addresses[0],addresses[0]+len(names)))
+        elif len(addresses) != len(names):
+            self._log.error(f"{method} addresses and names must have equal number of parameters")
+            return {}
+
+        # Read len(addresses) of consecutive coils/discrete inputs
+        res = getattr(self._modbus,method)(addresses[0], count = len(addresses), device_id=slave_id)
         if not res.function_code < 0x80:
             self._log.error(f"{method} failed")
             return result
-    
+
+        # Transform to name/value pairs
+        result = {}
         for idx, name in enumerate(names):
             result[name] = 1 if res.bits[idx] else 0
         
         return result
     
-    def _read_registers(self, method, slave_id, start_address, names, scales):
-        result = {}
-    
-        # Read len(names) of consecutive coils/registers
-        res = getattr(self._modbus,method)(start_address, count = len(names), slave=slave_id)
-        if not res.function_code < 0x80:
-            self._log.error(f"{method} failed")
-            return result
-                
+    def _read_registers(self, method, slave_id, addresses, datatypes, names, scales):
+        if len(addresses) == 1:
+            # Just given a starting addresses, all are consecutive
+            addresses = list(range(addresses[0],addresses[0]+len(names)))
+        elif len(addresses) != len(names):
+            self._log.error(f"{method} addresses and names must have equal number of parameters")
+            return {}
+
+        # If given datatypes, some are multi-register, expand the list of addresses
+        expanded_addresses = []
+        if datatypes:
+            for (start_address, datatype) in zip(addresses, datatypes):
+                no_registers = self._DATATYPES[datatype][0]
+                expanded_addresses.extend(range(start_address,start_address+no_registers))
+        else:
+            expanded_addresses = addresses
+
+        # Request up to 40 registers at a time (TODO: miss out non-consecutive addresses)
+        registers = []
+        start_address = expanded_addresses[0]
+        while True:
+            address_count = min(40, expanded_addresses[-1]-start_address+1)
+            resp = getattr(self._modbus,method)(start_address, count = address_count, device_id=slave_id)
+            if not resp.function_code < 0x80:
+                self._log.error(f"{method} failed")
+                return {}
+            registers.extend(resp.registers)
+            start_address += 40
+            if start_address > expanded_addresses[-1]:
+                break
+
+        # Get the registers required, where neccessary converting the datatype from multiple registers
+        values = []
+        for idx, start_address in enumerate(addresses):
+            start_address -= addresses[0] # adjust start_address for where we started reading registers
+            value = registers[start_address]
+            if datatypes:
+                (no_registers_for_type, pymodbus_type) = self._DATATYPES[datatype]
+                registers_for_value = registers[start_address:start_address+no_registers_for_type]
+                value = self._modbus.convert_from_registers(registers = registers_for_value, data_type = pymodbus_type)
+            values.append(value)
+
+        # Transform to name/value pairs and apply scaling factor
+        result = {}       
         for idx, name in enumerate(names):
-            result[name] = res.registers[idx] * scales[idx]
-        
+            result[name] = values[idx] * scales[idx]
         return result   
 
            
