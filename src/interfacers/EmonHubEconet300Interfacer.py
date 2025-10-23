@@ -94,7 +94,25 @@ class EmonHubEconet300Interfacer(EmonHubInterfacer):
             body = r.json()
             data = body['curr']
         except Exception as e:
-            raise Exception(f"Invalid data: {r.content}")
+            raise Exception(f"Invalid data from regParams: {r.content}")
+
+        # Additional properties from editParams
+        r = requests.get("http://" + self._host + "/econet/editParams", auth=basic)
+        if r.status_code != 200:
+            raise Exception(f"Couldn't fetch data ({r.status_code})")
+        
+        try:
+            body = r.json()
+            data['FanSpeed'] = body['informationParams']['22'][1][0][0]
+            data['TargetLWT'] = body['informationParams']['12'][1][0][0]
+            data['Circuit1DesiredLWT'] = body['informationParams']['93'][1][0][0]
+            data['FlowRate'] = body['data']['1211']['value']
+
+        except Exception as e:
+            raise Exception(f"Invalid data from editParams: {r.content}")
+
+        print(data)
+
 
         # Cargo object for returning values
         c = Cargo.new_cargo()
