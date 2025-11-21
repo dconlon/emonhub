@@ -117,8 +117,8 @@ class EmonHubEconet300Interfacer(EmonHubInterfacer):
         # Cargo object for returning values
         c = Cargo.new_cargo()
         c.rawdata = None
-        c.realdata = data.values()
-        c.names = data.keys()
+        c.realdata = list(data.values())
+        c.names = list(data.keys())
         c.nodeid = self._NodeId
         c.nodename = self._NodeName
 
