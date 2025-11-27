@@ -37,6 +37,63 @@ class EmonHubEconet300Interfacer(EmonHubInterfacer):
 
         self._next_poll_time = None
 
+        self._information_params = {
+            '11':  'pump_running', # 0 is yes
+            '12':  'target_flow_temp',
+            '13':  'is_space_heating', # 0 is HW, 1 is CH
+            '14':  'actual_flow_temp', # 
+            '15':  'actual_return_temp',
+            '21':  'compressor_frequency',
+            '22':  'unknown_information_22',
+            '23':  'oat_at_heatpump',
+            '24':  'unknown_information_24',
+            '25':  'unknown_information_25',
+            '22':  'fan_speed',
+            '26':  'heat_demanded', # 0 is yes
+            '61':  'dhw_actual_temp',
+            '71':  'unknown_information_71',
+            '72':  'unknown_information_72',
+            '81':  'unknown_information_81',
+            '91':  'unknown_information_91',
+            '92':  'unknown_information_92',
+            '93':  'circuit1_target_flow_temp',
+            '101': 'unknown_information_101',
+            '111': 'unknown_information_111',
+            '181': 'panel_firmware_version',
+            '182': 'controller_firmware_version',
+            '184': 'uid',
+            '185': 'serial_number',
+            '211': 'input_power',
+            '212': 'output_power',
+            '221': 'cop',
+            '222': 'scop',
+            '243': 'unknown_information_243',
+            '244': 'unknown_information_244',
+        }
+
+        self._data_params = {
+            '14': 'actual_flow_temp',
+            '24': 'actual_flow_temp',
+            '91': 'actual_flow_temp',
+            '119': 'dhw_work_mode', # 0 is off, 1 is on, 2 is scheduled
+            '103': 'dhw_setpoint',
+            '104': 'dhw_hysteresis',
+            '115': 'dhw_boost',
+            '236': 'circuit1_work_mode', # 0 is off, 1 is day, 2 is night, 3 is scheduled
+            '238': 'circuit1_day_setpoint',
+            '239': 'circuit1_night_setpoint',
+            '240': 'circuit1_hysteresis',
+            '273': 'circuit1_weather_curve',
+            '275': 'circuit1_weather_curve_shift',
+            '1211': 'flow_rate',
+            '10413': 'panel_temp_correction', #?
+
+            '69': 'unknown_data_69', # 85-87
+            '111': 'unknown_data_111', # 19.4
+            '1219': 'unknown_data_1219', # 645-660-765
+            '1307': 'unknown_data_1307', # 352, 678-697
+        }
+
     def close(self):
         return None
         
@@ -103,16 +160,27 @@ class EmonHubEconet300Interfacer(EmonHubInterfacer):
         
         try:
             body = r.json()
-            data['FanSpeed'] = body['informationParams']['22'][1][0][0]
-            data['TargetLWT'] = body['informationParams']['12'][1][0][0]
-            data['Circuit1DesiredLWT'] = body['informationParams']['93'][1][0][0]
-            data['FlowRate'] = body['data']['1211']['value']
+
+            for (key, value) in body['informationParams'].items():
+                value = value[1][0][0]
+                if key in self._information_params:
+                    name = self._information_params[key]
+                    data[name] = value
+                else:
+                    print(f"unknown information {key}: {value}")
+
+            for (key, value) in body['data'].items():
+                value = value['value']
+                if key in self._data_params:
+                    name = self._data_params[key]
+                    data[name] = value
+                else:
+                    print(f"unknown data {key}: {value}")
 
         except Exception as e:
             raise Exception(f"Invalid data from editParams: {r.content}")
 
         print(data)
-
 
         # Cargo object for returning values
         c = Cargo.new_cargo()
