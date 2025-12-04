@@ -38,36 +38,35 @@ class EmonHubEconet300Interfacer(EmonHubInterfacer):
         self._next_poll_time = None
 
         self._information_params = {
-            '11':  'pump_running', # 0 is yes
+            '11':  'circulation_pump_state', # 1 = pump stopped, 0 = pump running
             '12':  'target_flow_temp',
             '13':  'is_space_heating', # 0 is HW, 1 is CH
-            '14':  'actual_flow_temp', # 
-            '15':  'actual_return_temp',
+            '14':  'flow_temp', 
+            '15':  'return_temp',
             '21':  'compressor_frequency',
             '22':  'unknown_information_22',
-            '23':  'oat_at_heatpump',
-            '24':  'unknown_information_24',
-            '25':  'unknown_information_25',
+            '23':  'ambient_temp_heatpump',
+            '24':  'unknown_information_24', # flow_temp
+            '25':  'unknown_information_25', # return_temp
             '22':  'fan_speed',
-            '26':  'heat_demanded', # 0 is yes
-            '61':  'dhw_actual_temp',
-            '71':  'unknown_information_71',
-            '72':  'unknown_information_72',
-            '81':  'unknown_information_81',
+            '26':  'no_heat_demanded', # 1 - no heat demanded, 0 - heat demanded
+            '61':  'dhw_temp',
+            '71':  'unknown_information_71', #  could be buffer_temp_top
+            '72':  'unknown_information_72', # seems same as 81 and TempBuforDownreturn temp or buffer_temp_bottom
             '91':  'unknown_information_91',
-            '92':  'unknown_information_92',
+            '92':  'unknown_information_92', # follows but lags behind return_temp, could be a temp probe
             '93':  'circuit1_target_flow_temp',
-            '101': 'unknown_information_101',
-            '111': 'unknown_information_111',
-            '181': 'panel_firmware_version',
+            '101': 'circuit2_measured_temp', # overall ch flow temp, TempCircuit2
+            '111': 'circuit3_measured_temp', # boiler flow temp, TempCircuit3
+            '181': 'touchscreen_firmware_version',
             '182': 'controller_firmware_version',
             '184': 'uid',
             '185': 'serial_number',
-            '211': 'input_power',
-            '212': 'output_power',
-            '221': 'cop',
-            '222': 'scop',
-            '243': 'unknown_information_243',
+            '211': 'input_power', # not working
+            '212': 'output_power', # not working
+            '221': 'cop', # not working
+            '222': 'scop', # not working
+            '243': 'unknown_information_243', # follows but lags behind return_temp
             '244': 'unknown_information_244',
         }
 
@@ -78,20 +77,25 @@ class EmonHubEconet300Interfacer(EmonHubInterfacer):
             '119': 'dhw_work_mode', # 0 is off, 1 is on, 2 is scheduled
             '103': 'dhw_setpoint',
             '104': 'dhw_hysteresis',
+            '111': 'touchscreen_ambient_temp', # to check
             '115': 'dhw_boost',
+            '136': 'dhw_legionella_setpoint',  # Legionella protection temperature (60-80°C)
+            '137': 'dhw_legionella_day',       # Legionella protection day of week (0-6)
+            '138': 'dhw_legionella_hour',      # Legionella protection hour (0-23)
             '236': 'circuit1_work_mode', # 0 is off, 1 is day, 2 is night, 3 is scheduled
             '238': 'circuit1_day_setpoint',
             '239': 'circuit1_night_setpoint',
             '240': 'circuit1_hysteresis',
             '273': 'circuit1_weather_curve',
             '275': 'circuit1_weather_curve_shift',
+            '702': 'summer_on_temp',  # Outdoor temp threshold to activate summer mode (26-30°C)
+            '703': 'Summer_off_temp',  # Outdoor temp threshold to deactivate summer mode (0-26°C)
             '1211': 'flow_rate',
-            '10413': 'panel_temp_correction', #?
+            '10413': 'touchscreen_temp_correction', #?
 
-            '69': 'unknown_data_69', # 85-87
-            '111': 'unknown_data_111', # 19.4
-            '1219': 'unknown_data_1219', # 645-660-765
-            '1307': 'unknown_data_1307', # 352, 678-697
+            '69': 'unknown_data_69', # 85-87 "TempSettings"
+            '1219': 'fan_speed', # 645-660-765 Looks like fan speed
+            '1307': 'unknown_data_1307', # 352, 678-697 roughly follows OAT
         }
 
     def close(self):
