@@ -85,8 +85,9 @@ class EmonHubEconet300Interfacer(EmonHubInterfacer):
             'silent_mode_level':            ('data', '1385'),             # 0 = level 1, 2 = level 2
             'silent_mode':                  ('data', '1386'),             # 0 = off, 2 = scheduled
             'touchscreen_temp_correction':  ('data', '10413'), # to check
-            'weather_sensor_temp':          ('regParams', 'TempWthr'),
-            'touchscreen_ambient_temp':     ('regParams', 'Circuit1thermostat'), # to check
+            'weather_sensor_temp':          ('curr', 'TempWthr'),
+            'touchscreen_ambient_temp':     ('curr', 'Circuit1thermostat'), # only if C1 has touchscreen set as its thermostat
+            'system_pressure':              ('tilesParams', 76)
 
         }
 
@@ -142,8 +143,10 @@ class EmonHubEconet300Interfacer(EmonHubInterfacer):
 
         for (name, (location, key) ) in self._params_map.items():
             try:
-                if location == 'regParams':
+                if location == 'curr':
                     value = regParams['curr'][key]
+                elif location == 'tilesParams':
+                    value = regParams['tilesParams'][key][0][0][0]
                 elif location == 'informationParams':
                     value = editParams['informationParams'][key][1][0][0]
                 elif location == 'data':
