@@ -37,65 +37,57 @@ class EmonHubEconet300Interfacer(EmonHubInterfacer):
 
         self._next_poll_time = None
 
-        self._information_params = {
-            '11':  'circulation_pump_state', # 1 = pump stopped, 0 = pump running
-            '12':  'target_flow_temp',
-            '13':  'is_space_heating', # 0 is HW, 1 is CH
-            '14':  'flow_temp', 
-            '15':  'return_temp',
-            '21':  'compressor_frequency',
-            '22':  'unknown_information_22',
-            '23':  'ambient_temp_heatpump',
-            '24':  'unknown_information_24', # flow_temp
-            '25':  'unknown_information_25', # return_temp
-            '22':  'fan_speed',
-            '26':  'no_heat_demanded', # 1 - no heat demanded, 0 - heat demanded
-            '61':  'dhw_temp',
-            '71':  'unknown_information_71', #  could be buffer_temp_top
-            '72':  'unknown_information_72', # seems same as 81 and TempBuforDownreturn temp or buffer_temp_bottom
-            '91':  'unknown_information_91',
-            '92':  'unknown_information_92', # follows but lags behind return_temp, could be a temp probe
-            '93':  'circuit1_target_flow_temp',
-            '101': 'circuit2_measured_temp', # overall ch flow temp, TempCircuit2
-            '111': 'circuit3_measured_temp', # boiler flow temp, TempCircuit3
-            '181': 'touchscreen_firmware_version',
-            '182': 'controller_firmware_version',
-            '184': 'uid',
-            '185': 'serial_number',
-            '211': 'input_power', # not working
-            '212': 'output_power', # not working
-            '221': 'cop', # not working
-            '222': 'scop', # not working
-            '243': 'unknown_information_243', # follows but lags behind return_temp
-            '244': 'unknown_information_244',
-        }
+        # Known parameters for Grant Aerona R290, many originally identified by:
+        #
+        #   @GSV3MiaC in https://community.openenergymonitor.org/t/new-heat-pump-grant-r290-hot-water-advice/28254/38
+        #
+        #   @LeeNuss in https://github.com/LeeNuss/ecoNET-300-Home-Assistant-Integration/tree/1.2.0-a-ecomax360-1
+        #
+        self._params_map = {
+            'circulation_pump_stopped':     ('informationParams', '11'),  # 1 = pump stopped, 0 = pump running
+            'target_flow_temp':             ('informationParams', '12'),
+            'is_space_heating':             ('informationParams', '13'),  # 0 is HW, 1 is CH
+            'flow_temp':                    ('informationParams', '14'),  # duplicated at 24 and data 14, 24, 91
+            'return_temp':                  ('informationParams', '15'),  # duplicated at 25
+            'compressor_frequency':         ('informationParams', '21'),
+            'fan_speed':                    ('informationParams', '22'),  # duplicated at data 1219
+            'ambient_temp_heatpump':        ('informationParams', '23'),
+            'no_heat_demanded':             ('informationParams', '26'),  # 1 - no heat demanded, 0 - heat demanded
+            'dhw_temp':                     ('informationParams', '61'),
+            'buffer_temp_top':              ('informationParams', '71'),  # buffer top temp probe, duplicated at 92 and 243
+            'circuit1_target_flow_temp':    ('informationParams', '93'),
+            'circuit2_measured_temp':       ('informationParams', '101'), # circuit2 temp probe
+            'circuit3_measured_temp':       ('informationParams', '111'), # circuit3 temp probe
+            'touchscreen_firmware_version': ('informationParams', '181'),
+            'controller_firmware_version':  ('informationParams', '182'),
+            'uid':                          ('informationParams', '184'),
+            'serial_number':                ('informationParams', '185'),
+            'input_power':                  ('informationParams', '211'), # not working
+            'output_power':                 ('informationParams', '212'), # not working
+            'cop':                          ('informationParams', '221'), # not working
+            'scop':                         ('informationParams', '222'), # not working
+            'dhw_work_mode':                ('data', '119'),              # 0 is off, 1 is on, 2 is scheduled
+            'dhw_setpoint':                 ('data', '103'),
+            'dhw_hysteresis':               ('data', '104'),
+            'dhw_boost':                    ('data', '115'),
+            'dhw_legionella_setpoint':      ('data', '136'),              # Legionella protection temperature (60-80°C)
+            'dhw_legionella_day':           ('data', '137'),              # Legionella protection day of week (0-6)
+            'dhw_legionella_hour':          ('data', '138'),              # Legionella protection hour (0-23)
+            'circuit1_work_mode':           ('data', '236'),              # 0 is off, 1 is day, 2 is night, 3 is scheduled
+            'circuit1_day_setpoint':        ('data', '238'),
+            'circuit1_night_setpoint':      ('data', '239'),
+            'circuit1_hysteresis':          ('data', '240'),
+            'circuit1_weather_curve':       ('data', '273'),
+            'circuit1_weather_curve_shift': ('data', '275'),
+            'summer_on_temp':               ('data', '702'),              # Outdoor temp threshold to activate summer mode (26-30°C)
+            'summer_off_temp':              ('data', '703'),              # Outdoor temp threshold to deactivate summer mode (0-26°C)
+            'flow_rate':                    ('data', '1211'),
+            'silent_mode_level':            ('data', '1385'),             # 0 = level 1, 2 = level 2
+            'silent_mode':                  ('data', '1386'),             # 0 = off, 2 = scheduled
+            'touchscreen_temp_correction':  ('data', '10413'), # to check
+            'weather_sensor_temp':          ('regParams', 'TempWthr'),
+            'touchscreen_ambient_temp':     ('regParams', 'Circuit1thermostat'), # to check
 
-        self._data_params = {
-            '14': 'actual_flow_temp',
-            '24': 'actual_flow_temp',
-            '91': 'actual_flow_temp',
-            '119': 'dhw_work_mode', # 0 is off, 1 is on, 2 is scheduled
-            '103': 'dhw_setpoint',
-            '104': 'dhw_hysteresis',
-            '111': 'touchscreen_ambient_temp', # to check
-            '115': 'dhw_boost',
-            '136': 'dhw_legionella_setpoint',  # Legionella protection temperature (60-80°C)
-            '137': 'dhw_legionella_day',       # Legionella protection day of week (0-6)
-            '138': 'dhw_legionella_hour',      # Legionella protection hour (0-23)
-            '236': 'circuit1_work_mode', # 0 is off, 1 is day, 2 is night, 3 is scheduled
-            '238': 'circuit1_day_setpoint',
-            '239': 'circuit1_night_setpoint',
-            '240': 'circuit1_hysteresis',
-            '273': 'circuit1_weather_curve',
-            '275': 'circuit1_weather_curve_shift',
-            '702': 'summer_on_temp',  # Outdoor temp threshold to activate summer mode (26-30°C)
-            '703': 'Summer_off_temp',  # Outdoor temp threshold to deactivate summer mode (0-26°C)
-            '1211': 'flow_rate',
-            '10413': 'touchscreen_temp_correction', #?
-
-            '69': 'unknown_data_69', # 85-87 "TempSettings"
-            '1219': 'fan_speed', # 645-660-765 Looks like fan speed
-            '1307': 'unknown_data_1307', # 352, 678-697 roughly follows OAT
         }
 
     def close(self):
@@ -119,7 +111,7 @@ class EmonHubEconet300Interfacer(EmonHubInterfacer):
 
     # Override base read code from emonhub_interfacer
     def read(self):
-        """Read data from inverter"""
+        """Read data from Econet bridge"""
 
         # Wait until we are ready to fetch
         if not self._is_it_time():
@@ -128,7 +120,7 @@ class EmonHubEconet300Interfacer(EmonHubInterfacer):
         cargo = None
 
         try:
-            cargo = self._fetch()
+            cargo = self._fetch_data()
 
             # Poll timer reset after successful fetch
             self._set_poll_timer(self._poll_interval)
@@ -142,49 +134,25 @@ class EmonHubEconet300Interfacer(EmonHubInterfacer):
 
         return cargo
 
-    def _fetch(self):
-        basic = HTTPBasicAuth(self._username, self._password)
+    def _fetch_data(self):
+        regParams  = self._econet_http_request("/econet/regParams")
+        editParams = self._econet_http_request("/econet/editParams")
 
-        r = requests.get("http://" + self._host + "/econet/regParams", auth=basic)
+        data = {}
 
-        if r.status_code != 200:
-            raise Exception(f"Couldn't fetch data ({r.status_code})")
-        
-        data = None
-        try:
-            body = r.json()
-            data = body['curr']
-        except Exception as e:
-            raise Exception(f"Invalid data from regParams: {r.content}")
-
-        # Additional properties from editParams
-        r = requests.get("http://" + self._host + "/econet/editParams", auth=basic)
-        if r.status_code != 200:
-            raise Exception(f"Couldn't fetch data ({r.status_code})")
-        
-        try:
-            body = r.json()
-
-            for (key, value) in body['informationParams'].items():
-                value = value[1][0][0]
-                if key in self._information_params:
-                    name = self._information_params[key]
-                    data[name] = value
+        for (name, (location, key) ) in self._params_map.items():
+            try:
+                if location == 'regParams':
+                    value = regParams['curr'][key]
+                elif location == 'informationParams':
+                    value = editParams['informationParams'][key][1][0][0]
+                elif location == 'data':
+                    value = editParams['data'][key]['value']
                 else:
-                    print(f"unknown information {key}: {value}")
-
-            for (key, value) in body['data'].items():
-                value = value['value']
-                if key in self._data_params:
-                    name = self._data_params[key]
-                    data[name] = value
-                else:
-                    print(f"unknown data {key}: {value}")
-
-        except Exception as e:
-            raise Exception(f"Invalid data from editParams: {r.content}")
-
-        print(data)
+                    raise Exception(f"Unknown param location {location}")
+                data[name] = value
+            except Exception as e:
+                self._log.warning(f"Unable to retrieve {name}: {e.__class__.__name__} {e}")
 
         # Cargo object for returning values
         c = Cargo.new_cargo()
@@ -195,3 +163,17 @@ class EmonHubEconet300Interfacer(EmonHubInterfacer):
         c.nodename = self._NodeName
 
         return c
+
+    def _econet_http_request(self, path):
+        basic = HTTPBasicAuth(self._username, self._password)
+
+        r = requests.get("http://" + self._host + path, auth=basic)
+
+        if r.status_code != 200:
+            raise Exception(f"Couldn't fetch data ({r.status_code})")
+        
+        try:
+            body = r.json()
+            return body
+        except Exception as e:
+            raise Exception(f"Invalid data from path: {r.content}")
