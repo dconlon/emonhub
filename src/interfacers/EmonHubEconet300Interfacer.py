@@ -8,21 +8,21 @@ __author__ = 'Dan Conlon'
 import sys
 import time
 import traceback
-import requests
+import requestse
 import Cargo
 from emonhub_interfacer import EmonHubInterfacer
 from requests.auth import HTTPBasicAuth
 
 
 """class EmonHubEconet300Interfacer
-Fetch metrics from a Plum EcoNET-300 bridge (used by Grant Aerona heat pumps). This interfacer
+Fetch metrics from a Plum ecoNET 300 bridge (used by Grant Aerona heat pumps). This interfacer
 periodically polls the bridge HTTP API and maps returned fields (which are nested in different
 sections) into a flat payload with descriptive names.
 """
 
 # Known parameters for Grant Aerona R290 heat pumps. Each entry maps a human-friendly
 # name to a tuple (location, key) representing the location of the parameter in the JSON
-# returned by the EcoNET-300 API. Parameters have been detemrined by community reverse
+# returned by the ecoNET-300 API. Parameters have been detemrined by community reverse
 # engineering and experimentation (see Sources below).
 #
 # Sources:
@@ -82,7 +82,7 @@ class EmonHubEconet300Interfacer(EmonHubInterfacer):
 
         Parameters
         - name: string used as node name
-        - host: hostname/IP of EcoNET-300 bridge
+        - host: hostname/IP of ecoNET-300 bridge
         - username/password: basic auth credentials for bridge HTTP API
         - pollinterval: seconds between successful polls
         - nodeid: node id to use in generated Cargo (default 30)
