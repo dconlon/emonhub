@@ -1,4 +1,3 @@
-
 from emonhub_interfacer import EmonHubInterfacer
 import Cargo
 import time
@@ -30,6 +29,7 @@ class EmonHubRFM69LPLInterfacer(EmonHubInterfacer):
             self._log.error(err)
 
         self.Radio = False
+        self.polling_mode = False
         try:            
             from RFM69 import Radio
             self.Radio = Radio
@@ -76,7 +76,27 @@ class EmonHubRFM69LPLInterfacer(EmonHubInterfacer):
         self.last_received = False
 
         board = {'isHighPower': False, 'interruptPin': self.interruptPin, 'resetPin': self.resetPin, 'selPin':self.selPin, 'spiDevice': 0, 'encryptionKey':"89txbe4p8aik5kt3"}
-        self.radio = self.Radio(self.freqBand, self.node_id, self.network_id, verbose=False, **board)
+
+        self.radio = False
+
+        try:
+            self.radio = self.Radio(self.freqBand, self.node_id, self.network_id, verbose=False, **board)
+        except Exception as err:
+            if str(err) == "Failed to add edge detection":
+                # == Fallback to polling mode if interrupt setup fails ==
+                # Override interrupt setup to allow polling mode
+                self.Radio._init_interrupt = lambda self: True
+                try:
+                    self.radio = self.Radio(self.freqBand, self.node_id, self.network_id, verbose=False, **board)
+                except Exception as err:
+                    self._log.error("Error initializing RFM69 in polling mode: "+str(err))
+
+                if self.radio:
+                    self.polling_mode = True
+                    self._log.warning("Polling mode enabled for RFM69 (interrupt setup failed)")
+                # == End of fallback to polling mode ==
+            else:
+                self._log.error("Error initializing RFM69 in interrupt mode: "+str(err))
         
         if not self.radio.init_success:
             self._log.error("Could not connect to RFM69 module") 
@@ -85,6 +105,7 @@ class EmonHubRFM69LPLInterfacer(EmonHubInterfacer):
             self.last_packet_nodeid = 0
             self.last_packet_data = []
             self.last_packet_time = 0
+            # Note: __enter__ is called to set up radio resources
             self.radio.__enter__()
 
 
@@ -98,7 +119,11 @@ class EmonHubRFM69LPLInterfacer(EmonHubInterfacer):
         """
         if not self.radio.init_success:
             return False
-            
+
+        # If in polling mode, manually call interrupt handler to check for packets  
+        if self.polling_mode:
+            self.radio._interruptHandler(self.interruptPin)
+
         packet = self.radio.get_packet()
         if packet:
             self._log.info("Packet received "+str(len(packet.data))+" bytes")

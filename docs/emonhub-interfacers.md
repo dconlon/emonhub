@@ -217,7 +217,7 @@ Default config to read from SDM630 and SDM72D Modbus three-phase 100A meter, see
 ```
 
 
-#### Rayleigh RI-d35-100
+#### Rayleigh RI-D35-100
 
 EmonHub can read from a [Rayleigh RI-D35-100](https://www.rayleigh.com/ri-d35-100-mid-certified-single-phase-multifunction-energy-meter.html) single-phase 100A electricity meter via modbus using the following config:
 
@@ -242,6 +242,38 @@ EmonHub can read from a [Rayleigh RI-D35-100](https://www.rayleigh.com/ri-d35-10
 ```
 
 [Rayleigh Modbus register documentaion](https://www.rayleigh.com/media/uploads/RI-D35-C-COMM-V01.pdf)
+
+#### Rayleigh RI-D140
+
+EmonHub can read from a [Rayleigh RI-D140](https://www.rayleigh.com/ri-d140-mid-certified-multifunction-din-rail-meter.html) three-phase electricity meter via modbus using the following config:
+
+```
+[[RI-D140]]
+    Type = EmonHubMinimalModbusInterfacer
+    [[[init_settings]]]
+        device = /dev/ttyUSB0
+        baud = 9600
+        # 'byteorder = 3' handles "Reverse Word" (CD AB) common in Rayleigh meters
+        byteorder = 3
+    [[[runtime_settings]]]
+        pubchannels = ToEmonCMS,
+        read_interval = 10
+        nodename = RI-D140
+        address = 1
+        # Function Code 3 is the default for this interfacer
+        # Registers (Offset from 30000):
+        # 0: V1, 2: V2, 4: V3, 6: AvgV
+        # 16: I1, 18: I2, 20: I3, 22: AvgI
+        # 42: Total kW, 52
+        # 58: Import kWh, 74: Export kWh
+        registers = 0, 2, 4, 6, 16, 18, 20, 22, 42, 58, 74
+        names = V1, V2, V3, V_avg, I1, I2, I3, I_avg, P_tot, Import_kWh, Export_kWh
+        precision = 2, 2, 2, 2, 3, 3, 3, 3, 3, 2, 2
+        datacodes = f, f, f, f, f, f, f, f, f, f, f 
+        scales = 1, 1, 1, 1, 1, 1, 1, 1, 1000, 1, 1
+```
+
+[Rayleigh Modbus register documentaion](https://www.rayleigh.com/media/uploads/RI-D140-C-COMM-V01.pdf)
 
 
 #### Eaton EPBMETER1
@@ -270,6 +302,37 @@ Modbus settings should be: `parity = none` and `stopbit = 1`.
 
 [EPBMETER1 Modbus register documentaion](https://files.openenergymonitor.org/EPBMETER1.pdf), add one to the last part of the address to get the modbodbus register number to use in emonhub. e.g `total_energy_imported (kWh)` has address `30096` therefore emonhub register is `97`
 
+#### Voltaris VDT45M 
+
+EmonHub can read from a [Voltaris VDT45M](https://www.spwales.com/voltaris-vdt45m) three-phase electricity meter via modbus using the following config:
+
+```
+[[VDT45M]]
+    Type = EmonHubMinimalModbusInterfacer
+    [[[init_settings]]]
+        device = /dev/ttyUSB0
+        baud = 9600
+    [[[runtime_settings]]]
+        pubchannels = ToEmonCMS,
+        read_interval = 10
+        nodename = VDT45M
+        # Modbus Unit ID (Factory default is 1)
+        address = 1
+        # Use Function Code 04 for Input Registers 
+        function_code = 4
+        # Registers (Converted from Hex to Decimal):
+        # 0x00=0 (V1), 0x02=2 (V2), 0x04=4 (V3)
+        # 0x06=6 (I1), 0x08=8 (I2), 0x0A=10 (I3)
+        # 0x34=52 (Total P), 0x3E=62 (Total PF), 0x46=70 (Freq)
+        # 0x48=72 (Import Energy), 0x4A=74
+        registers = 0, 2, 4, 6, 8, 10, 52, 62, 70, 72, 74
+        names = V1, V2, V3, I1, I2, I3, P_tot, PF, Freq, Import_kWh, Export_kWh
+        datacodes = f, f, f, f, f, f, f, f, f, f, f
+        scales = 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
+        precision = 2, 2, 2, 3, 3, 3, 1, 3, 2, 2, 2
+```
+
+Register Documentation: http://downloads.spwales.com/tpdvo45m-modbus-protocol.pdf
 
 ### Modbus Heat Meters
 
