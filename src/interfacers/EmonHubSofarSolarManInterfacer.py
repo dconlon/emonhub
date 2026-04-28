@@ -131,8 +131,8 @@ class EmonHubSofarSolarManInterfacer(EmonHubInterfacer):
         # Cargo object for returning values
         c = Cargo.new_cargo()
         c.rawdata = None
-        c.realdata = stats.values()
-        c.names = stats.keys()
+        c.realdata = list(stats.values())
+        c.names = list(stats.keys())
         c.nodeid = self._NodeId
         c.nodename = self._NodeName
 
